@@ -1,6 +1,8 @@
 use actix_web::{App, HttpServer, web};
+use env_logger;
 use futures_util::stream::StreamExt;
 use log::error;
+use log::info;
 use solana_sdk::instruction::Instruction;
 use solana_transaction_status::{
     EncodedTransaction, UiInstruction, UiMessage, UiParsedInstruction,
@@ -47,28 +49,29 @@ async fn start_indexer() -> anyhow::Result<()> {
         indexer_config.persistence_path.clone(),
     ));
 
-    // Start persistence task
+    // persistence tasks
     let persistence_clone = persistence.clone();
     tokio::spawn(async move {
         persistence_clone.run().await;
     });
 
-    // Initialize query handler
+    // query handler
     let query_handler = Arc::new(QueryHandler::new(indexer.clone()));
 
-    // Start HTTP server
     let query_handler_clone = query_handler.clone();
     let server = HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(query_handler_clone.clone()))
             .route("/tokens", web::get().to(query::handle_query))
     })
-    .bind("0.0.0.0:8080")?
+    .bind((SERVER_HOST, SERVER_PORT))?
     .run();
+
+    info!("SERVER STARTS AT {}:{}", SERVER_HOST, SERVER_PORT);
 
     tokio::spawn(server);
 
-    // Start Geyser streaming
+    // geyser streaming
     let (tx, mut rx) = mpsc::channel::<SubscribeUpdate>(100);
     let mut client = GeyserGrpcClient::build_from_static(DEFAULT_GEYSER_ENDPOINT)
         .tls_config(ClientTlsConfig::new().with_native_roots())?
@@ -76,7 +79,7 @@ async fn start_indexer() -> anyhow::Result<()> {
         .await
         .map_err(|e| anyhow::anyhow!("Failed to connect to Geyser: {:?}", e))?;
 
-    println!("Connected to Geyser at {}", DEFAULT_GEYSER_ENDPOINT);
+    info!("Connected to Geyser at {}", DEFAULT_GEYSER_ENDPOINT);
 
     let mut subscribe_request = SubscribeRequest::default();
     subscribe_request.transactions.insert(
@@ -160,7 +163,7 @@ async fn process_tx_update(
 
     for token_info in instructions {
         indexer_write.add_token(token_info.clone());
-        println!(
+        info!(
             "Indexed new token: {} (CA: {}, Symbol: {})",
             token_info.name, token_info.mint, token_info.symbol
         );
