@@ -1,12 +1,20 @@
+mod base;
+mod indexer;
+mod persistence;
+mod query;
+mod utils;
+
 use actix_web::{App, HttpServer, web};
 use env_logger;
 use futures_util::stream::StreamExt;
 use log::error;
 use log::info;
 use solana_sdk::instruction::Instruction;
+use solana_sdk::{pubkey::Pubkey, signature::Signature};
 use solana_transaction_status::{
     EncodedTransaction, UiInstruction, UiMessage, UiParsedInstruction,
 };
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{RwLock, mpsc};
 use tonic::transport::ClientTlsConfig;
@@ -16,18 +24,10 @@ use yellowstone_grpc_proto::prelude::{
     subscribe_update::UpdateOneof,
 };
 
-mod base;
-mod indexer;
-mod persistence;
-mod query;
-mod utils;
-
 use base::*;
 use indexer::{Indexer, IndexerConfig};
 use persistence::Persistence;
 use query::QueryHandler;
-use solana_sdk::{pubkey::Pubkey, signature::Signature};
-use std::str::FromStr;
 use utils::{CreateTokenInfo, TransactionPretty, parse_create_token_data, parse_instruction};
 
 #[tokio::main]
@@ -163,10 +163,10 @@ async fn process_tx_update(
 
     for token_info in instructions {
         indexer_write.add_token(token_info.clone());
-        info!(
-            "Indexed new token: {} (CA: {}, Symbol: {})",
-            token_info.name, token_info.mint, token_info.symbol
-        );
+        // info!(
+        //     "Indexed new token: {} (CA: {}, Symbol: {})",
+        //     token_info.name, token_info.mint, token_info.symbol
+        // );
     }
 
     Ok(())

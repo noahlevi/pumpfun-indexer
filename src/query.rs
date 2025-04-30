@@ -3,6 +3,8 @@ use actix_web::{HttpResponse, Responder, web};
 use serde::Deserialize;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use log::error;
+use log::info;
 
 pub struct QueryHandler {
     indexer: Arc<RwLock<Indexer>>,
@@ -22,9 +24,10 @@ impl QueryHandler {
 }
 
 pub async fn handle_query(
-    query_handler: web::Data<QueryHandler>,
+    query_handler: web::Data<Arc<QueryHandler>>,
     query: web::Query<QueryParams>,
 ) -> impl Responder {
+    info!("Received query");
     let indexer = query_handler.indexer.read().await;
     let tokens = indexer.query_tokens(
         query.min_age_hours,
